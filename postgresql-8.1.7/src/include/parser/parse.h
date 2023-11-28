@@ -1,1 +1,0 @@
-/home/zhou0176/postgresql-8.1.7/src/backend/parser/parse.h
