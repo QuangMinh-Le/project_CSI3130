@@ -40,12 +40,21 @@ static void ExecHashIncreaseNumBatches(HashJoinTable hashtable);
  *		stub for pro forma compliance
  * ----------------------------------------------------------------
  */
+// DEBUT DE LA FONCTION CSI3530 // Start of the function CSI3130
 TupleTableSlot *
 ExecHash(HashState *node)
 {
+	// CSI3530 CREER LES VARIABLES POUR LE PLAN , HASHJOINTABLE ET..
+	// CSI3530 OBTENEZ L'ETAT DU OUTER NODE
+	// CSI3530 INITIALISEZ LE EXPRESSION CONTEXT
+	// CSI3530 COMPUTE HASH VALUE
+	//...
+	// CSI3130 For variables, plan, hash join table get the state of outer node
+	// CSI3130 Initialize the expression context and compute hash value
 	elog(ERROR, "Hash node does not support ExecProcNode call convention");
 	return NULL;
 }
+// FIN DE LA FONCTION CSI3530 // CSI3130 End of function
 
 /* ----------------------------------------------------------------
  *		MultiExecHash
