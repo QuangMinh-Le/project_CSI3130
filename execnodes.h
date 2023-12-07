@@ -10,6 +10,9 @@
  * $PostgreSQL: pgsql/src/include/nodes/execnodes.h,v 1.139.2.3 2005/11/28 23:46:25 tgl Exp $
  *
  *-------------------------------------------------------------------------
+ * Modification made for Project CSI3130 by:
+ * Quang Minh Le: 300165003
+ * Zechen Zhou: 300292820 
  */
 #ifndef EXECNODES_H
 #define EXECNODES_H
@@ -771,7 +774,7 @@ typedef struct PlanState
 	 * Other run-time state needed by most if not all node types.
 	 */
 	TupleTableSlot *ps_OuterTupleSlot;	/* slot for current "outer" tuple */
-										/* CSI3530 / CSI3130 -slot for current "INNER" tuple */
+	TupleTableSlot *ps_InnerTupleSlot;	/* CSI3530 / CSI3130 -slot for current "INNER" tuple */
 	TupleTableSlot *ps_ResultTupleSlot; /* slot for my result tuples */
 	ExprContext *ps_ExprContext;	/* node's expression-evaluation context */
 	ProjectionInfo *ps_ProjInfo;	/* info for doing tuple projection */
@@ -1116,20 +1119,51 @@ typedef struct HashJoinState
 {
 	JoinState	js;				/* its first field is NodeTag */
 	List	   *hashclauses;	/* list of ExprState nodes */
-	HashJoinTable hj_HashTable;
-	uint32		hj_CurHashValue;
-	int			hj_CurBucketNo;
-	HashJoinTuple hj_CurTuple;
+	
+	HashJoinTable hj_InnerHashTable; //CSI3130
+	HashJoinTable hj_OuterHashTable; //CSI3130
+
+	uint32		hj_InnerCurHashValue;//CSI3130
+	uint32		hj_OuterCurHashValue;//CSI3130
+
+	int			hj_InnerCurBucketNo;//CSI3130
+	int			hj_OuterCurBucketNo;//CSI3130
+
+	HashJoinTuple hj_InnerCurTuple;
+	HashJoinTuple hj_OuterCurTuple;	//CSI3130
+
 	List	   *hj_OuterHashKeys;		/* list of ExprState nodes */
 	List	   *hj_InnerHashKeys;		/* list of ExprState nodes */
-	List	   *hj_HashOperators;		/* list of operator OIDs */
+
+	List	   *hj_HashOperators;	/* list of operator OIDs */
+
 	TupleTableSlot *hj_OuterTupleSlot;
-	TupleTableSlot *hj_HashTupleSlot;
+	TupleTableSlot *hj_InnerTupleSlot;	//CSI3130
+
+	TupleTableSlot *hj_InnerHashTupleSlot;	//CSI3130
+	TupleTableSlot *hj_OuterHashTupleSlot;	//CSI3130
 	TupleTableSlot *hj_NullInnerTupleSlot;
+
+	TupleTableSlot *hj_FirstInnerTupleSlot;	//CSI3130
 	TupleTableSlot *hj_FirstOuterTupleSlot;
+
+
+   bool     hj_InnerExhausted; //CSI3130
+   bool     hj_OuterExhausted; //CSI3130
+	bool 		hj_NeedNewInner; 	//CSI3130
 	bool		hj_NeedNewOuter;
+
 	bool		hj_MatchedOuter;
+
+	bool 		hj_InnerNotEmpty;	//CSI3130
 	bool		hj_OuterNotEmpty;
+
+	bool 		hj_FetchingFromInner;	//CSI3130 true if tuple is fetched from inner relation
+
+	int      hj_InnerProbing; //CSI3130 number of tuples found by probing inner relation
+   int      hj_OuterProbing; //CSI3130 number of tuples found by probing outer relation
+
+
 } HashJoinState;
 
 

@@ -13,8 +13,9 @@
  *	  $PostgreSQL: pgsql/src/backend/optimizer/plan/createplan.c,v 1.202.2.4 2006/05/18 18:57:37 tgl Exp $
  *
  *-------------------------------------------------------------------------
- * ...
- * new
+ * Modification made for Project CSI3130 by:
+ * Quang Minh Le: 300165003
+ * Zechen Zhou: 300292820
  */
 #include "postgres.h"
 
@@ -1452,7 +1453,11 @@ create_hashjoin_plan(PlannerInfo *root,
 	List	   *otherclauses;
 	List	   *hashclauses;
 	HashJoin   *join_plan;
-	Hash	   *hash_plan;
+	//CSI3130
+	Hash	   *inner_hash_plan;
+	//CSI3130
+	Hash 		*outer_hash_plan;
+
 	// CSI3530 IL FAUT AJOUTER UN AUTRE HASH_PLAN, DEUX AU TOTAL (INNER ET OUTER)
 	// CSI3130 You must add another hash plan, two in total (inner and outer)
 
@@ -1496,13 +1501,19 @@ create_hashjoin_plan(PlannerInfo *root,
 	 */
 	// CSI3530 Il faut construire le hash node et le hash join node pour les deux hash plans (outer et inner)
 	// CSI3130 You must build the hash node and hash join node for both hash plans (outer and inner)
-	hash_plan = make_hash(inner_plan);
+	// CSI3130
+	inner_hash_plan = make_hash(inner_plan);
+	//CSI 3130
+	outer_hash_plan = make_hash(outer_plan);
+
 	join_plan = make_hashjoin(tlist,
 							  joinclauses,
 							  otherclauses,
 							  hashclauses,
-							  outer_plan,
-							  (Plan *) hash_plan,
+							  //CSI 3130
+							  (Plan *) inner_hash_plan,
+							  //CSI 3130
+							  (Plan *) outer_hash_plan,
 							  // CSI3530 //CSI3130 ...
 							  best_path->jpath.jointype);
 

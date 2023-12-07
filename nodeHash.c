@@ -18,6 +18,11 @@
  *		ExecInitHash	- initialize node and subnodes
  *		ExecEndHash		- shutdown node and subnodes
  */
+/*
+ * Modification made for Project CSI3130 by:
+ * Quang Minh Le: 300165003
+ * Zechen Zhou: 300292820
+*/
 #include "postgres.h"
 
 #include "executor/execdebug.h"
@@ -45,14 +50,48 @@ TupleTableSlot *
 ExecHash(HashState *node)
 {
 	// CSI3530 CREER LES VARIABLES POUR LE PLAN , HASHJOINTABLE ET..
-	// CSI3530 OBTENEZ L'ETAT DU OUTER NODE
-	// CSI3530 INITIALISEZ LE EXPRESSION CONTEXT
-	// CSI3530 COMPUTE HASH VALUE
-	//...
-	// CSI3130 For variables, plan, hash join table get the state of outer node
-	// CSI3130 Initialize the expression context and compute hash value
-	elog(ERROR, "Hash node does not support ExecProcNode call convention");
-	return NULL;
+	PlanState *outerNode;	//CSI3130
+	List	   *hashKeys;		//CSI3130
+	HashJoinTable hashtable;	//CSI3130
+	TupleTableSlot *slot;		//CSI3130
+	ExprContext *econtext;		//CSI3130
+	uint32		hashvalue;		//CSI3130
+
+	//CSI3130
+	// Instrumentation Support
+	if (node->ps.instrument)
+	{
+		InstrStartNode(node->ps.instrument);
+	}
+
+	//CSI3130
+	// State Information of Node
+	outerNode = outerPlanState(node);
+	hashtable = node->hashtable;
+	
+	//CSI3130
+	// Expression Context
+	hashKeys = node->hashkeys;
+	econtext = node->ps.ps_ExprContext;
+
+	//CSI3130
+	if (!TupIsNull(slot)) 
+	{
+		hashtable -> totalTuples += 1;
+		econtext -> ecxt_innertuple = slot;
+		econtext -> ecxt_outertuple = slot;
+		hashvalue = ExecHashGetHashValue(hashtable, econtext, hashKeys);
+		ExecHashTableInsert(hashtable, ExecFetchSlotTuple(slot), hashvalue);
+
+		if (node->ps.instrument) {
+			InstrStopNodeMulti(node->ps.instrument, hashtable->totalTuples);
+		}
+	} else
+	{
+		return NULL;
+	}
+
+	return slot;	//CSI3130
 }
 // FIN DE LA FONCTION CSI3530 // CSI3130 End of function
 
@@ -256,7 +295,7 @@ ExecHashTableCreate(Hash *node, List *hashOperators)
 	hashtable->curbatch = 0;
 	hashtable->nbatch_original = nbatch;
 	hashtable->nbatch_outstart = nbatch;
-	hashtable->growEnabled = true;
+	hashtable->growEnabled = false;	//CSI3130
 	hashtable->totalTuples = 0;
 	hashtable->innerBatchFile = NULL;
 	hashtable->outerBatchFile = NULL;
@@ -762,50 +801,105 @@ HeapTuple
 ExecScanHashBucket(HashJoinState *hjstate,
 				   ExprContext *econtext)
 {
-	List	   *hjclauses = hjstate->hashclauses;
-	HashJoinTable hashtable = hjstate->hj_HashTable;
-	HashJoinTuple hashTuple = hjstate->hj_CurTuple;
-	uint32		hashvalue = hjstate->hj_CurHashValue;
-
-	/*
-	 * hj_CurTuple is NULL to start scanning a new bucket, or the address of
-	 * the last tuple returned from the current bucket.
-	 */
-	if (hashTuple == NULL)
-		hashTuple = hashtable->buckets[hjstate->hj_CurBucketNo];
-	else
-		hashTuple = hashTuple->next;
-
-	while (hashTuple != NULL)
+	//CSI3130
+	if (hjstate->hj_FetchingFromInner)
 	{
-		if (hashTuple->hashvalue == hashvalue)
+		List	   *hjclauses = hjstate->hashclauses;
+		HashJoinTable hashtable = hjstate->hj_OuterHashTable;	//CSI3130
+		HashJoinTuple hashTuple = hjstate->hj_OuterCurTuple;	//CSI3130
+		uint32		hashvalue = hjstate->hj_InnerCurHashValue;	//CSI3130
+		
+	
+		/*
+		 * hj_CurTuple is NULL to start scanning a new bucket, or the address of
+		 * the last tuple returned from the current bucket.
+		 */
+		if (hashTuple == NULL)
+			hashTuple = hashtable->buckets[hjstate->hj_OuterCurBucketNo];	//CSI3130
+		else
+			hashTuple = hashTuple->next;
+
+		while (hashTuple != NULL)
 		{
-			HeapTuple	heapTuple = &hashTuple->htup;
-			TupleTableSlot *inntuple;
-
-			/* insert hashtable's tuple into exec slot so ExecQual sees it */
-			inntuple = ExecStoreTuple(heapTuple,
-									  hjstate->hj_HashTupleSlot,
-									  InvalidBuffer,
-									  false);	/* do not pfree */
-			econtext->ecxt_innertuple = inntuple;
-
-			/* reset temp memory each time to avoid leaks from qual expr */
-			ResetExprContext(econtext);
-
-			if (ExecQual(hjclauses, econtext, false))
+			if (hashTuple->hashvalue == hashvalue)
 			{
-				hjstate->hj_CurTuple = hashTuple;
-				return heapTuple;
+				HeapTuple	heapTuple = &hashTuple->htup;
+				TupleTableSlot *inntuple;
+
+				/* insert hashtable's tuple into exec slot so ExecQual sees it */
+				inntuple = ExecStoreTuple(heapTuple,
+										  hjstate->hj_OuterHashTupleSlot,		//CSI3130
+										  InvalidBuffer,
+										  false);	/* do not pfree */
+				econtext->ecxt_innertuple = inntuple;
+
+				/* reset temp memory each time to avoid leaks from qual expr */
+				ResetExprContext(econtext);
+
+				if (ExecQual(hjclauses, econtext, false))
+				{
+					hjstate->hj_OuterCurTuple = hashTuple;		//CSI3130
+					return heapTuple;
+				}
+
+				hashTuple = hashTuple->next;
 			}
+
 		}
 
-		hashTuple = hashTuple->next;
-	}
+		/*
+		 * no match
+		 */
+		return NULL;
+	} else //CSI3130
+	{
+		List	   *hjclauses = hjstate->hashclauses;
+		HashJoinTable hashtable = hjstate->hj_InnerHashTable; //CSI3130
+		HashJoinTuple hashTuple = hjstate->hj_InnerCurTuple;	//CSI3130
+		uint32		hashvalue = hjstate->hj_OuterCurHashValue;	//CSI3130
+		
+	
+		/*
+		 * hj_CurTuple is NULL to start scanning a new bucket, or the address of
+		 * the last tuple returned from the current bucket.
+		 */
+		if (hashTuple == NULL)
+			hashTuple = hashtable->buckets[hjstate->hj_InnerCurBucketNo];	//CSI3130
+		else
+			hashTuple = hashTuple->next;
 
-	/*
-	 * no match
-	 */
+		while (hashTuple != NULL)
+		{
+			if (hashTuple->hashvalue == hashvalue)
+			{
+				HeapTuple	heapTuple = &hashTuple->htup;
+				TupleTableSlot *inntuple;
+
+				/* insert hashtable's tuple into exec slot so ExecQual sees it */
+				inntuple = ExecStoreTuple(heapTuple,
+										  hjstate->hj_InnerHashTupleSlot,	//CSI3130
+										  InvalidBuffer,
+										  false);	/* do not pfree */
+				econtext->ecxt_innertuple = inntuple;
+
+				/* reset temp memory each time to avoid leaks from qual expr */
+				ResetExprContext(econtext);
+
+				if (ExecQual(hjclauses, econtext, false))
+				{
+					hjstate->hj_InnerCurTuple = hashTuple;		//CSI3130
+					return heapTuple;
+				}
+
+				hashTuple = hashTuple->next;
+			}
+
+		}	
+		/*
+		 * no match
+		 */
+		return NULL;	
+	}
 	return NULL;
 }
 
